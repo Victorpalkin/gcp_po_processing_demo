@@ -4,7 +4,7 @@ import os
 import time
 
 from google.api_core.client_options import ClientOptions
-from google.cloud import documentai_v1 as documentai
+from google.cloud import documentai_v1beta3 as documentai
 
 
 def _get_client() -> documentai.DocumentProcessorServiceClient:
@@ -13,6 +13,14 @@ def _get_client() -> documentai.DocumentProcessorServiceClient:
         api_endpoint=f"{location}-documentai.googleapis.com"
     )
     return documentai.DocumentProcessorServiceClient(client_options=opts)
+
+
+def _get_doc_service_client() -> documentai.DocumentServiceClient:
+    location = os.environ.get("DOCAI_LOCATION", "us")
+    opts = ClientOptions(
+        api_endpoint=f"{location}-documentai.googleapis.com"
+    )
+    return documentai.DocumentServiceClient(client_options=opts)
 
 
 def _parent() -> str:
@@ -58,15 +66,16 @@ def get_processor_with_schema(processor_name: str) -> dict:
 
     # Get dataset schema for field definitions
     try:
+        doc_client = _get_doc_service_client()
         dataset_name = f"{processor_name}/dataset"
-        dataset = client.get_dataset_schema(name=dataset_name)
+        dataset = doc_client.get_dataset_schema(name=dataset_name)
         if dataset.document_schema and dataset.document_schema.entity_types:
             for entity_type in dataset.document_schema.entity_types:
                 for prop in entity_type.properties:
                     field = {
                         "name": prop.name,
                         "display_name": prop.display_name or prop.name,
-                        "description": "",
+                        "description": prop.description or "",
                         "occurrence_type": prop.occurrence_type.name
                         if prop.occurrence_type
                         else "OPTIONAL_ONCE",
@@ -121,6 +130,7 @@ def create_processor(
         prop = documentai.DocumentSchema.EntityType.Property(
             name=field["name"],
             display_name=field.get("display_name", field["name"]),
+            description=field.get("description", ""),
             value_type=field.get("value_type", "string"),
             occurrence_type=occurrence,
         )
@@ -130,25 +140,22 @@ def create_processor(
         name="custom_extraction_document_type",
         display_name=display_name,
         properties=properties,
-        base_types=[
-            documentai.DocumentSchema.EntityType.EnumValue(
-                name="document",
-            )
-        ]
-        if False
-        else [],
+        base_types=["document"],
     )
 
-    schema = documentai.DocumentSchema(entity_types=[entity_type])
+    schema = documentai.DocumentSchema(
+        entity_types=[entity_type],
+        description=description,
+    )
     dataset_schema = documentai.DatasetSchema(
         name=f"{processor_name}/dataset",
         document_schema=schema,
     )
 
     try:
-        client.update_dataset_schema(dataset_schema=dataset_schema)
+        doc_client = _get_doc_service_client()
+        doc_client.update_dataset_schema(dataset_schema=dataset_schema)
     except Exception as e:
-        # Log but don't fail - schema update may not be needed for all setups
         raise RuntimeError(f"Failed to update dataset schema: {e}")
 
     # Step 3: Train processor version with foundation model (GenAI / zero-shot)
