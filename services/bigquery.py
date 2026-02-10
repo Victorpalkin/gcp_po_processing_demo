@@ -54,7 +54,7 @@ def update_extraction(record_id: str, updates: dict) -> None:
     params = []
 
     if "reviewed_data" in updates:
-        set_clauses.append("reviewed_data = @reviewed_data")
+        set_clauses.append("reviewed_data = PARSE_JSON(@reviewed_data)")
         params.append(
             bigquery.ScalarQueryParameter(
                 "reviewed_data", "STRING", json.dumps(updates["reviewed_data"])
