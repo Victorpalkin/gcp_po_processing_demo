@@ -89,6 +89,21 @@ def get_processor_with_schema(processor_name: str) -> dict:
     return info
 
 
+def _parse_entity_properties(properties):
+    """Recursively parse entity properties into nested dicts."""
+    parsed = []
+    for prop in properties:
+        entry = {
+            "name": prop.type_,
+            "value": prop.mention_text or "",
+            "confidence": prop.confidence or 0.0,
+        }
+        if prop.properties:
+            entry["properties"] = _parse_entity_properties(prop.properties)
+        parsed.append(entry)
+    return parsed
+
+
 def delete_processor(processor_name: str) -> None:
     """Delete a processor."""
     client = _get_client()
@@ -148,13 +163,7 @@ def process_document(
 
         # Handle nested properties (line items, etc.)
         if entity.properties:
-            field_data["properties"] = []
-            for prop in entity.properties:
-                field_data["properties"].append({
-                    "name": prop.type_,
-                    "value": prop.mention_text or "",
-                    "confidence": prop.confidence or 0.0,
-                })
+            field_data["properties"] = _parse_entity_properties(entity.properties)
 
         # Handle multiple entities of the same type (e.g., line items)
         if field_name in fields:

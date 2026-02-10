@@ -1,6 +1,5 @@
 """Review & Send — edit extracted fields and send."""
 
-import json
 from datetime import datetime
 
 import pandas as pd
@@ -115,46 +114,86 @@ else:
     edited_df = None
     st.info("No flat fields extracted.")
 
+# --- Helpers for nested property flatten/unflatten ---
+
+def _flatten_properties(properties, prefix=""):
+    """Flatten nested properties into {path: value} dict."""
+    flat = {}
+    for prop in properties:
+        key = prop["name"] if not prefix else f"{prefix}/{prop['name']}"
+        flat[key] = prop.get("value", "")
+        if prop.get("properties"):
+            flat.update(_flatten_properties(prop["properties"], prefix=key))
+    return flat
+
+
+def _unflatten_to_properties(flat_row):
+    """Convert {path: value} back to nested properties list."""
+    root = {}
+    for path, value in flat_row.items():
+        parts = path.split("/")
+        node = root
+        for part in parts[:-1]:
+            if part not in node:
+                node[part] = {"value": "", "children": {}}
+            node = node[part]["children"]
+        leaf = parts[-1]
+        if leaf in node:
+            node[leaf]["value"] = value
+        else:
+            node[leaf] = {"value": value, "children": {}}
+
+    def _build(tree):
+        result = []
+        for name, data in tree.items():
+            entry = {"name": name, "value": data.get("value", "")}
+            children = data.get("children", {})
+            if children:
+                entry["properties"] = _build(children)
+            result.append(entry)
+        return result
+
+    return _build(root)
+
+
 # --- Line items editor ---
+edited_line_items = {}
+
 if line_item_fields:
     st.subheader("Line Items")
 
     for group_name, items in line_item_fields.items():
         st.write(f"**{group_name}**")
 
-        if isinstance(items, list):
-            # Build a DataFrame from line item properties
-            item_rows = []
-            for item in items:
-                if isinstance(item, dict):
-                    if "properties" in item:
-                        row = {}
-                        for prop in item["properties"]:
-                            row[prop["name"]] = prop.get("value", "")
-                        item_rows.append(row)
-                    else:
-                        item_rows.append({"Value": item.get("value", "")})
+        items_list = items if isinstance(items, list) else [items]
 
-            if item_rows:
-                items_df = pd.DataFrame(item_rows)
-                edited_items = st.data_editor(
-                    items_df,
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    key=f"line_items_{group_name}",
-                )
-                line_item_fields[group_name] = edited_items.to_dict("records")
-        elif isinstance(items, dict) and "properties" in items:
-            props = items["properties"]
-            row = {p["name"]: p.get("value", "") for p in props}
-            items_df = pd.DataFrame([row])
-            edited_items = st.data_editor(
+        item_rows = []
+        for item in items_list:
+            if isinstance(item, dict):
+                if "properties" in item:
+                    item_rows.append(_flatten_properties(item["properties"]))
+                else:
+                    item_rows.append({"value": item.get("value", "")})
+
+        if item_rows:
+            items_df = pd.DataFrame(item_rows).fillna("")
+            edited_items_df = st.data_editor(
                 items_df,
                 num_rows="dynamic",
                 use_container_width=True,
                 key=f"line_items_{group_name}",
             )
-            line_item_fields[group_name] = edited_items.to_dict("records")
+            edited_rows = []
+            for _, row in edited_items_df.iterrows():
+                row_dict = row.to_dict()
+                has_nested = any("/" in k for k in row_dict)
+                if has_nested or len(row_dict) > 1 or "value" not in row_dict:
+                    edited_rows.append({
+                        "properties": _unflatten_to_properties(row_dict),
+                    })
+                else:
+                    edited_rows.append({"value": row_dict.get("value", "")})
+            edited_line_items[group_name] = edited_rows
 
 # --- Action buttons ---
 st.divider()
@@ -178,7 +217,7 @@ with col_send:
                 }
 
         # Add line items
-        for group_name, items in line_item_fields.items():
+        for group_name, items in edited_line_items.items():
             reviewed_data[group_name] = items
 
         # Send to SAP (mock by default — see services/sap.py)

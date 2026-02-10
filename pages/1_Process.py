@@ -134,25 +134,41 @@ if "results" in st.session_state and st.session_state["results"]:
             fields = result.get("extracted_data", {})
 
             if fields:
-                for field_name, field_data in fields.items():
-                    if isinstance(field_data, list):
-                        # Multiple values (e.g., line items)
-                        st.write(f"**{field_name}** ({len(field_data)} items)")
-                        for item in field_data:
-                            col1, col2 = st.columns([3, 1])
-                            col1.write(item.get("value", "—"))
-                            col2.markdown(
-                                confidence_html(item.get("confidence", 0)),
-                                unsafe_allow_html=True,
-                            )
-                    else:
+                def _display_properties(properties, indent=0):
+                    prefix = "&nbsp;" * (indent * 4)
+                    for prop in properties:
                         col1, col2, col3 = st.columns([1, 2, 1])
-                        col1.write(f"**{field_name}**")
-                        col2.write(field_data.get("value", "—"))
-                        col3.markdown(
-                            confidence_html(field_data.get("confidence", 0)),
+                        col1.markdown(
+                            f"{prefix}**{prop['name']}**",
                             unsafe_allow_html=True,
                         )
+                        col2.write(prop.get("value", "—"))
+                        col3.markdown(
+                            confidence_html(prop.get("confidence", 0)),
+                            unsafe_allow_html=True,
+                        )
+                        if prop.get("properties"):
+                            _display_properties(prop["properties"], indent + 1)
+
+                def _display_entity(field_name, field_data):
+                    col1, col2, col3 = st.columns([1, 2, 1])
+                    col1.write(f"**{field_name}**")
+                    col2.write(field_data.get("value", "—"))
+                    col3.markdown(
+                        confidence_html(field_data.get("confidence", 0)),
+                        unsafe_allow_html=True,
+                    )
+                    if field_data.get("properties"):
+                        _display_properties(field_data["properties"], indent=1)
+
+                for field_name, field_data in fields.items():
+                    if isinstance(field_data, list):
+                        st.write(f"**{field_name}** ({len(field_data)} items)")
+                        for item in field_data:
+                            _display_entity(field_name, item)
+                            st.markdown("---")
+                    else:
+                        _display_entity(field_name, field_data)
             else:
                 st.info("No fields extracted.")
 
