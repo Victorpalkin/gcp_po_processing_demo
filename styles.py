@@ -6,8 +6,7 @@ CUSTOM_CSS = """
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header[data-testid="stHeader"] {
-    background-color: #1a73e8;
-    padding: 0.5rem 1rem;
+    display: none;
 }
 
 /* App header bar */

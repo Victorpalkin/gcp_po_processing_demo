@@ -66,11 +66,7 @@ def get_processor_with_schema(processor_name: str) -> dict:
                     field = {
                         "name": prop.name,
                         "display_name": prop.display_name or prop.name,
-                        "description": (
-                            prop.property_metadata.description
-                            if prop.property_metadata
-                            else ""
-                        ),
+                        "description": "",
                         "occurrence_type": prop.occurrence_type.name
                         if prop.occurrence_type
                         else "OPTIONAL_ONCE",
@@ -127,9 +123,6 @@ def create_processor(
             display_name=field.get("display_name", field["name"]),
             value_type=field.get("value_type", "string"),
             occurrence_type=occurrence,
-            property_metadata=documentai.PropertyMetadata(
-                description=field.get("description", ""),
-            ),
         )
         properties.append(prop)
 

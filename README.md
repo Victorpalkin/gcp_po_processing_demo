@@ -82,7 +82,6 @@ gcloud run deploy po-processing \
   --region us-central1 \
   --set-env-vars PROJECT_ID=$PROJECT_ID,DOCAI_LOCATION=us,GCS_BUCKET=${PROJECT_ID}-po-uploads,BQ_DATASET=po_processing \
   --service-account po-processing-sa@$PROJECT_ID.iam.gserviceaccount.com \
-  --no-allow-unauthenticated \
   --memory 1Gi
 ```
 

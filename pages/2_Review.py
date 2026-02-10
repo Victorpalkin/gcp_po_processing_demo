@@ -11,6 +11,7 @@ load_dotenv()
 
 from styles import apply_styles, render_header, confidence_html
 from services import bigquery
+from services import sap
 
 st.set_page_config(page_title="Review Extraction", page_icon="📋", layout="wide")
 apply_styles()
@@ -180,6 +181,14 @@ with col_send:
         for group_name, items in line_item_fields.items():
             reviewed_data[group_name] = items
 
+        # Send to SAP (mock by default — see services/sap.py)
+        filename = review_result.get("filename", "unknown")
+        try:
+            sap_result = sap.send_purchase_order(reviewed_data, filename)
+        except Exception as e:
+            st.error(f"Failed to send to SAP: {e}")
+            st.stop()
+
         record_id = review_result.get("id")
         if record_id:
             try:
@@ -190,7 +199,10 @@ with col_send:
                     "reviewed_at": now,
                     "sent_at": now,
                 })
-                st.success("PO sent successfully!")
+                doc_num = sap_result["document_number"]
+                st.success(
+                    f"PO sent successfully! SAP document: {doc_num}"
+                )
                 st.toast("PO sent!", icon="✅")
 
                 # Update session state
@@ -198,8 +210,8 @@ with col_send:
                 review_result["reviewed_data"] = reviewed_data
 
             except Exception as e:
-                st.error(f"Failed to send: {e}")
+                st.error(f"Failed to update record: {e}")
         else:
-            # No BigQuery record (shouldn't happen in normal flow)
-            st.success("PO reviewed and sent (mock).")
+            doc_num = sap_result["document_number"]
+            st.success(f"PO sent (SAP document: {doc_num}).")
             st.json(reviewed_data)
