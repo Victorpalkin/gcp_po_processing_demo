@@ -21,26 +21,31 @@ def _table_id() -> str:
 def save_extraction(record: dict) -> str:
     """Insert an extraction result row. Returns the record ID."""
     client = _get_client()
+    table = _table_id()
     record_id = record.get("id", uuid.uuid4().hex)
 
-    row = {
-        "id": record_id,
-        "filename": record["filename"],
-        "gcs_uri": record["gcs_uri"],
-        "processor_name": record["processor_name"],
-        "processor_display_name": record.get("processor_display_name", ""),
-        "status": record.get("status", "EXTRACTED"),
-        "extracted_data": json.dumps(record["extracted_data"]),
-        "reviewed_data": json.dumps(record["reviewed_data"]) if record.get("reviewed_data") else None,
-        "confidence": record.get("confidence", 0.0),
-        "created_at": datetime.utcnow().isoformat(),
-        "reviewed_at": None,
-        "sent_at": None,
-    }
+    query = f"""
+        INSERT INTO `{table}`
+        (id, filename, gcs_uri, processor_name, processor_display_name,
+         status, extracted_data, confidence, created_at)
+        VALUES
+        (@id, @filename, @gcs_uri, @processor_name, @processor_display_name,
+         @status, PARSE_JSON(@extracted_data), @confidence, @created_at)
+    """
+    params = [
+        bigquery.ScalarQueryParameter("id", "STRING", record_id),
+        bigquery.ScalarQueryParameter("filename", "STRING", record["filename"]),
+        bigquery.ScalarQueryParameter("gcs_uri", "STRING", record["gcs_uri"]),
+        bigquery.ScalarQueryParameter("processor_name", "STRING", record["processor_name"]),
+        bigquery.ScalarQueryParameter("processor_display_name", "STRING", record.get("processor_display_name", "")),
+        bigquery.ScalarQueryParameter("status", "STRING", record.get("status", "EXTRACTED")),
+        bigquery.ScalarQueryParameter("extracted_data", "STRING", json.dumps(record["extracted_data"])),
+        bigquery.ScalarQueryParameter("confidence", "FLOAT64", record.get("confidence", 0.0)),
+        bigquery.ScalarQueryParameter("created_at", "TIMESTAMP", datetime.utcnow().isoformat()),
+    ]
 
-    errors = client.insert_rows_json(_table_id(), [row])
-    if errors:
-        raise RuntimeError(f"BigQuery insert errors: {errors}")
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
+    client.query(query, job_config=job_config).result()
 
     return record_id
 
