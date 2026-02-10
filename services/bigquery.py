@@ -154,9 +154,9 @@ def get_extractions(
     rows = []
     for row in results:
         record = dict(row)
-        if record.get("extracted_data"):
+        if record.get("extracted_data") and isinstance(record["extracted_data"], str):
             record["extracted_data"] = json.loads(record["extracted_data"])
-        if record.get("reviewed_data"):
+        if record.get("reviewed_data") and isinstance(record["reviewed_data"], str):
             record["reviewed_data"] = json.loads(record["reviewed_data"])
         rows.append(record)
 
@@ -183,9 +183,9 @@ def get_extraction(record_id: str) -> dict | None:
         return None
 
     record = dict(results[0])
-    if record.get("extracted_data"):
+    if record.get("extracted_data") and isinstance(record["extracted_data"], str):
         record["extracted_data"] = json.loads(record["extracted_data"])
-    if record.get("reviewed_data"):
+    if record.get("reviewed_data") and isinstance(record["reviewed_data"], str):
         record["reviewed_data"] = json.loads(record["reviewed_data"])
     return record
 
