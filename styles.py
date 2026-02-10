@@ -6,7 +6,14 @@ CUSTOM_CSS = """
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header[data-testid="stHeader"] {
-    display: none;
+    background: transparent;
+    height: 0;
+}
+button[data-testid="stBaseButton-headerNoPadding"] {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 999;
 }
 
 /* App header bar */
