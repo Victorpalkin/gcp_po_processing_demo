@@ -1,7 +1,6 @@
 """Document AI service for processor management and document extraction."""
 
 import os
-import time
 
 from google.api_core.client_options import ClientOptions
 from google.cloud import documentai_v1beta3 as documentai
@@ -67,10 +66,11 @@ def get_processor_with_schema(processor_name: str) -> dict:
     # Get dataset schema for field definitions
     try:
         doc_client = _get_doc_service_client()
-        dataset_name = f"{processor_name}/dataset"
+        dataset_name = f"{processor_name}/dataset/datasetSchema"
         dataset = doc_client.get_dataset_schema(name=dataset_name)
         if dataset.document_schema and dataset.document_schema.entity_types:
             for entity_type in dataset.document_schema.entity_types:
+                is_root = "document" in list(entity_type.base_types)
                 for prop in entity_type.properties:
                     field = {
                         "name": prop.name,
@@ -80,115 +80,13 @@ def get_processor_with_schema(processor_name: str) -> dict:
                         if prop.occurrence_type
                         else "OPTIONAL_ONCE",
                         "value_type": prop.value_type or "string",
+                        "parent": "" if is_root else entity_type.name,
                     }
                     info["fields"].append(field)
     except Exception:
-        # Schema may not exist yet for new processors
         pass
 
     return info
-
-
-def create_processor(
-    display_name: str,
-    description: str,
-    fields: list[dict],
-) -> str:
-    """Create a new Custom Extraction processor with a foundation model schema.
-
-    Args:
-        display_name: Human-readable name for the processor.
-        description: Description of the processor.
-        fields: List of field dicts with keys:
-            name, display_name, description, type ("Extract"/"Derive"), required
-
-    Returns:
-        The processor resource name.
-    """
-    client = _get_client()
-    parent = _parent()
-
-    # Step 1: Create the processor
-    processor = client.create_processor(
-        parent=parent,
-        processor=documentai.Processor(
-            display_name=display_name,
-            type_="CUSTOM_EXTRACTION_PROCESSOR",
-        ),
-    )
-    processor_name = processor.name
-
-    # Step 2: Update dataset schema with entity types
-    properties = []
-    for field in fields:
-        occurrence = (
-            documentai.DocumentSchema.EntityType.Property.OccurrenceType.REQUIRED_ONCE
-            if field.get("required", False)
-            else documentai.DocumentSchema.EntityType.Property.OccurrenceType.OPTIONAL_ONCE
-        )
-
-        prop = documentai.DocumentSchema.EntityType.Property(
-            name=field["name"],
-            display_name=field.get("display_name", field["name"]),
-            description=field.get("description", ""),
-            value_type=field.get("value_type", "string"),
-            occurrence_type=occurrence,
-        )
-        properties.append(prop)
-
-    entity_type = documentai.DocumentSchema.EntityType(
-        name="custom_extraction_document_type",
-        display_name=display_name,
-        properties=properties,
-        base_types=["document"],
-    )
-
-    schema = documentai.DocumentSchema(
-        entity_types=[entity_type],
-        description=description,
-    )
-    dataset_schema = documentai.DatasetSchema(
-        name=f"{processor_name}/dataset",
-        document_schema=schema,
-    )
-
-    try:
-        doc_client = _get_doc_service_client()
-        doc_client.update_dataset_schema(dataset_schema=dataset_schema)
-    except Exception as e:
-        raise RuntimeError(f"Failed to update dataset schema: {e}")
-
-    # Step 3: Train processor version with foundation model (GenAI / zero-shot)
-    try:
-        train_request = documentai.TrainProcessorVersionRequest(
-            parent=processor_name,
-            processor_version=documentai.ProcessorVersion(
-                display_name="v1",
-            ),
-            foundation_model_tuning_options=documentai.TrainProcessorVersionRequest.FoundationModelTuningOptions(
-                train_steps=0,  # Zero-shot: no training data needed
-            ),
-        )
-        operation = client.train_processor_version(request=train_request)
-        # Wait for training to complete
-        result = operation.result(timeout=600)
-        version_name = result.processor_version
-
-        # Step 4: Deploy the trained version
-        deploy_operation = client.deploy_processor_version(name=version_name)
-        deploy_operation.result(timeout=300)
-
-        # Set as default version
-        client.set_default_processor_version(
-            processor=processor_name,
-            default_processor_version=version_name,
-        )
-    except Exception as e:
-        raise RuntimeError(
-            f"Processor created ({processor_name}) but version training/deploy failed: {e}"
-        )
-
-    return processor_name
 
 
 def delete_processor(processor_name: str) -> None:

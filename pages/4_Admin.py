@@ -11,7 +11,7 @@ from services import document_ai
 
 st.set_page_config(page_title="Admin", page_icon="📋", layout="wide")
 apply_styles()
-render_header("Manage Processors", "Create, configure, and manage Document AI processors")
+render_header("Manage Processors", "View and manage Document AI processors")
 
 # --- List existing processors ---
 st.subheader("Existing Processors")
@@ -98,117 +98,4 @@ if processors:
                     st.rerun()
 
 else:
-    st.info("No processors found. Create one below.")
-
-st.divider()
-
-# --- Create new processor ---
-st.subheader("Create New Processor")
-
-with st.form("create_processor_form"):
-    proc_display_name = st.text_input("Name", placeholder="e.g. PO Extractor v1")
-    proc_description = st.text_area(
-        "Description",
-        placeholder="e.g. Extracts purchase order fields from scanned documents",
-    )
-
-    st.write("**Extraction Fields**")
-    st.caption("Define the fields to extract from documents. Add descriptive descriptions for best zero-shot accuracy.")
-
-    # Default schema template
-    default_fields = pd.DataFrame([
-        {
-            "field_name": "vendor_name",
-            "display_name": "Vendor Name",
-            "description": "The name of the vendor or supplier on the purchase order",
-            "type": "Extract",
-            "required": True,
-        },
-        {
-            "field_name": "po_number",
-            "display_name": "PO Number",
-            "description": "The unique purchase order number or identifier",
-            "type": "Extract",
-            "required": True,
-        },
-        {
-            "field_name": "total_amount",
-            "display_name": "Total Amount",
-            "description": "The total monetary amount of the purchase order",
-            "type": "Extract",
-            "required": True,
-        },
-    ])
-
-    fields_df = st.data_editor(
-        default_fields,
-        column_config={
-            "field_name": st.column_config.TextColumn(
-                "Field Name", help="Internal field name (snake_case)"
-            ),
-            "display_name": st.column_config.TextColumn(
-                "Display Name", help="Human-readable field name"
-            ),
-            "description": st.column_config.TextColumn(
-                "Description",
-                help="Detailed description for Document AI (improves accuracy)",
-                width="large",
-            ),
-            "type": st.column_config.SelectboxColumn(
-                "Type",
-                options=["Extract", "Derive"],
-                help="Extract = from document text, Derive = computed/inferred",
-            ),
-            "required": st.column_config.CheckboxColumn(
-                "Required", help="Whether this field is required"
-            ),
-        },
-        num_rows="dynamic",
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    submitted = st.form_submit_button("Create Processor", type="primary")
-
-if submitted:
-    if not proc_display_name.strip():
-        st.error("Processor name is required.")
-    elif fields_df.empty:
-        st.error("At least one extraction field is required.")
-    else:
-        # Convert DataFrame to field list
-        fields_list = []
-        for _, row in fields_df.iterrows():
-            if not row.get("field_name"):
-                continue
-            fields_list.append({
-                "name": row["field_name"],
-                "display_name": row.get("display_name", row["field_name"]),
-                "description": row.get("description", ""),
-                "required": bool(row.get("required", False)),
-                "value_type": "string",
-            })
-
-        if not fields_list:
-            st.error("At least one field with a name is required.")
-        else:
-            try:
-                with st.status("Creating processor...", expanded=True) as status:
-                    st.write("Creating processor in Document AI...")
-                    st.write("Configuring schema and training zero-shot model...")
-                    st.write("This may take a few minutes for version training and deployment...")
-
-                    processor_name = document_ai.create_processor(
-                        display_name=proc_display_name.strip(),
-                        description=proc_description.strip(),
-                        fields=fields_list,
-                    )
-
-                    status.update(label="Processor created!", state="complete")
-
-                st.success(f"Processor **{proc_display_name}** created successfully.")
-                st.toast("Processor created!", icon="✅")
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"Failed to create processor: {e}")
+    st.info("No processors found. Create processors via the Google Cloud Console.")
