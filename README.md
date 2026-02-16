@@ -30,7 +30,9 @@ gcloud services enable \
   run.googleapis.com \
   documentai.googleapis.com \
   storage.googleapis.com \
-  bigquery.googleapis.com
+  bigquery.googleapis.com \
+  artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com
 ```
 
 ### Create Resources
@@ -52,7 +54,7 @@ bq mk --table ${PROJECT_ID}:po_processing.extractions \
 ```bash
 gcloud iam service-accounts create po-processing-sa
 
-for ROLE in roles/documentai.apiUser roles/storage.objectAdmin roles/bigquery.dataEditor roles/bigquery.jobUser; do
+for ROLE in roles/documentai.apiUser roles/documentai.editor roles/storage.objectAdmin roles/bigquery.dataEditor roles/bigquery.jobUser; do
   gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member=serviceAccount:po-processing-sa@$PROJECT_ID.iam.gserviceaccount.com \
     --role=$ROLE
