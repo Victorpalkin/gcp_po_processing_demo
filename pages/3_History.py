@@ -5,11 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from auth import require_auth
 from styles import apply_styles, render_header, status_badge
 from services import bigquery
 
 st.set_page_config(page_title="History", page_icon="📋", layout="wide")
 apply_styles()
+require_auth()
 render_header("Processing History", "Browse and filter past extraction results")
 
 # --- Filters ---

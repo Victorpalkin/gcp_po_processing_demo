@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from auth import require_auth
 from styles import apply_styles, render_header, status_badge
 from services import bigquery
 
@@ -16,6 +17,7 @@ st.set_page_config(
 )
 
 apply_styles()
+require_auth()
 render_header("PO Processing", "Purchase Order extraction powered by Document AI")
 
 # --- Stats ---

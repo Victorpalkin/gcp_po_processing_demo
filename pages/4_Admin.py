@@ -6,11 +6,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from auth import require_auth
 from styles import apply_styles, render_header, status_badge
 from services import document_ai
 
 st.set_page_config(page_title="Admin", page_icon="📋", layout="wide")
 apply_styles()
+require_auth()
 render_header("Manage Processors", "View and manage Document AI processors")
 
 # --- List existing processors ---

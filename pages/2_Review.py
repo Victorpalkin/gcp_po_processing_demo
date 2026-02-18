@@ -8,11 +8,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from auth import require_auth
 from styles import apply_styles, render_header, confidence_html
 from services import bigquery, document_ai, sap, storage
 
 st.set_page_config(page_title="Review Extraction", page_icon="📋", layout="wide")
 apply_styles()
+require_auth()
 render_header("Review Extraction", "Edit extracted values and send when ready")
 
 # --- Load results ---

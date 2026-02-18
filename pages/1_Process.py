@@ -5,11 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from auth import require_auth
 from styles import apply_styles, render_header, confidence_html, status_badge
 from services import document_ai, storage, bigquery
 
 st.set_page_config(page_title="Process POs", page_icon="📋", layout="wide")
 apply_styles()
+require_auth()
 render_header("Process Purchase Orders", "Select a processor, upload documents, and extract data")
 
 # --- Processor selector ---
