@@ -12,7 +12,7 @@ Users upload POs (scans/PDFs/images), the app extracts structured data, users re
 | Doc AI  | Custom Extractor with GenAI (zero-shot)         |
 | Files   | Google Cloud Storage                            |
 | Results | BigQuery                                        |
-| Auth    | Identity-Aware Proxy on Cloud Run               |
+| Auth    | Password gate (APP_PASSWORD env var)            |
 | Deploy  | Cloud Run from source (Python buildpack)        |
 
 ## Setup
@@ -32,7 +32,8 @@ gcloud services enable \
   storage.googleapis.com \
   bigquery.googleapis.com \
   artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com
+  cloudbuild.googleapis.com \
+  secretmanager.googleapis.com
 ```
 
 ### Create Resources
@@ -70,8 +71,9 @@ export PROJECT_ID=your-gcp-project
 export DOCAI_LOCATION=us
 export GCS_BUCKET=${PROJECT_ID}-po-uploads
 export BQ_DATASET=po_processing
+export APP_PASSWORD=your-password
 
-streamlit run app.py
+streamlit run Dashboard.py
 ```
 
 The app will be available at http://localhost:8501.
@@ -83,11 +85,19 @@ gcloud run deploy po-processing \
   --source . \
   --region us-central1 \
   --set-env-vars PROJECT_ID=$PROJECT_ID,DOCAI_LOCATION=us,GCS_BUCKET=${PROJECT_ID}-po-uploads,BQ_DATASET=po_processing \
+  --update-secrets APP_PASSWORD=app-password:latest \
   --service-account po-processing-sa@$PROJECT_ID.iam.gserviceaccount.com \
   --memory 1Gi
 ```
 
-Configure IAP via the GCP Console for authentication.
+The `APP_PASSWORD` is stored as a [Secret Manager](https://cloud.google.com/secret-manager/docs) secret rather than a plain env var. Create the secret first:
+
+```bash
+echo -n "your-password" | gcloud secrets create app-password --data-file=-
+gcloud secrets add-iam-policy-binding app-password \
+  --member=serviceAccount:po-processing-sa@$PROJECT_ID.iam.gserviceaccount.com \
+  --role=roles/secretmanager.secretAccessor
+```
 
 ## Pages
 
@@ -112,3 +122,4 @@ Configure IAP via the GCP Console for authentication.
 | `DOCAI_LOCATION`| Document AI API location (e.g. us) |
 | `GCS_BUCKET`    | GCS bucket for file uploads        |
 | `BQ_DATASET`    | BigQuery dataset name              |
+| `APP_PASSWORD`  | Password for app login             |
